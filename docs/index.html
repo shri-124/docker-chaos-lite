@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chaos Engineering Lite</title>
+  <meta name="description" content="A one-page guide and results viewer for the Chaos Engineering Lite project (Nginx → Flask API → Redis + chaos script)." />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <style>
+    :root {
+      --bg: #0b1020; /* deep navy */
+      --fg: #e6ecff;
+      --muted: #a9b4d0;
+      --brand: #7aa2ff;
+      --card: #121934;
+      --accent: #00d0b6;
+      --warn: #ffb86b;
+      --danger: #ff6b6b;
+      --ok: #6bff93;
+      --border: #22305f;
+      --code: #0a0f1f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { background: linear-gradient(180deg, #0a0f1f 0%, #0c1330 100%); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { width: min(1100px, 92vw); margin: 0 auto; }
+    header.hero { padding: 48px 0 28px; text-align: center; }
+    .title { font-size: clamp(28px, 4vw, 42px); font-weight: 800; letter-spacing: .3px; }
+    .tagline { color: var(--muted); margin-top: 8px; }
+    .badgebar { margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .badge { border: 1px solid var(--border); background: #0f1736; color: #cfe3ff; padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+
+    section { margin: 28px 0; }
+    .card { background: linear-gradient(180deg, #111938, #0f1733); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .grid { display: grid; gap: 18px; }
+    .g-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    @media (max-width: 860px) { .g-2 { grid-template-columns: 1fr; } }
+
+    h2 { font-size: 20px; margin: 0 0 10px; letter-spacing:.2px }
+    p { margin: 8px 0; color: #dce6ff; }
+    ul { margin: 10px 0 0 18px; color: #dce6ff; }
+
+    .code { position: relative; background: var(--code); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow: auto; }
+    pre { margin: 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; color: #e7f0ff; }
+    .copybtn { position: absolute; top: 8px; right: 8px; background: #0e1640; color: #d9e6ff; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; padding: 6px 9px; cursor: pointer; }
+    .copybtn:hover { background: #14205a; }
+
+    .arch { padding: 18px; overflow-x: auto; display: flex; justify-content: center; }
+    .arch-content { display: flex; flex-direction: column; align-items: center; min-width: 640px; width: 100%; }
+    .arch svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; max-width: 500px; }
+
+    .upload { display: grid; gap: 10px; align-items: start; }
+    .kpi { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    @media (max-width: 860px) { .kpi { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .kcard { background: #0f1736; border:1px solid var(--border); border-radius: 12px; padding: 12px; }
+    .klabel { color: var(--muted); font-size: 12px; }
+    .kval { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+    .tablewrap { overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #1e2a55; text-align: left; font-size: 13px; }
+    th { color: #cfe3ff; background: #0e1635; position: sticky; top: 0; }
+    tr:hover td { background: rgba(122,162,255,0.06); }
+
+    .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border:1px solid var(--border); }
+    .pill-kill { background: rgba(255,107,107,.12); color: #ffb3b3; border-color: #713c3c; }
+    .pill-lat { background: rgba(255,184,107,.12); color: #ffd4a6; border-color: #7a5630; }
+
+    footer { text-align:center; color: var(--muted); padding: 32px 0 40px; }
+    .btn { display:inline-grid; place-items:center; padding:10px 14px; border-radius:10px; border:1px solid var(--border); color:#e6ecff; background:#0f1736; cursor:pointer; }
+    .btn:hover { background:#152055; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <header class="hero container">
+    <div class="title">⚡ Chaos Engineering Lite</div>
+    <div class="tagline">Nginx → Flask API → Redis · Docker Compose · Random kills/latency · Recovery time measurement</div>
+    <div class="badgebar" aria-label="stack">
+      <span class="badge">Docker Compose</span>
+      <span class="badge">Nginx</span>
+      <span class="badge">Flask</span>
+      <span class="badge">Redis</span>
+      <span class="badge">Python (requests)</span>
+      <span class="badge">CSV Results</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>📋 Clone This Project</h2>
+      <p>Get ready to work with the Chaos Engineering Lite project by cloning the repository and setting up your environment.</p>
+      <div class="code"><button class="copybtn" data-copy="#clone">Copy</button>
+        <pre><code id="clone"># Clone the repository
+git clone https://github.com/shri-124/docker-chaos-lite.git
+cd docker-chaos-lite
+
+# Ensure you have Docker and Docker Compose installed
+docker --version
+docker compose version
+
+# Optional: Set up Python virtual environment for chaos script
+python -m venv .venv
+# Windows PowerShell:
+. .venv/Scripts/Activate.ps1
+# Linux/macOS:
+# source .venv/bin/activate
+
+pip install requests</code></pre>
+      </div>
+      <p class="hint">Make sure Docker Desktop is running before proceeding with the quick start steps below.</p>
+    </section>
+
+    <section class="grid g-2">
+      <article class="card">
+        <h2>Quick Start</h2>
+        <p>Bring the stack up, then run the chaos script. When finished, upload <code>chaos_report.csv</code> below to visualize results.</p>
+        <div class="code"><button class="copybtn" data-copy="#qs">Copy</button>
+          <pre><code id="qs"># 1) start the services
+docker compose up -d --build
+
+# sanity check (Windows PowerShell)
+Invoke-WebRequest http://localhost:8080/health
+Invoke-WebRequest http://localhost:8080/api/
+
+# 2) run chaos (in a venv if you want)
+python -m venv .venv; . .venv/Scripts/Activate.ps1; pip install requests
+python chaos/chaos.py
+
+# 3) stop everything when done
+docker compose down -v</code></pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Architecture</h2>
+        <div class="arch">
+          <div class="arch-content">
+          <!-- inline SVG diagram -->
+          <svg width="600" height="200" viewBox="0 0 600 200" role="img" aria-label="Architecture diagram">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#152055"/>
+                <stop offset="1" stop-color="#0f1736"/>
+              </linearGradient>
+            </defs>
+            <!-- Boxes -->
+            <g font-family="monospace" font-size="12" fill="#e6ecff" stroke="#22305f" stroke-width="1.5">
+              <rect x="20" y="30" rx="8" ry="8" width="140" height="60" fill="url(#g1)"/>
+              <text x="90" y="55" text-anchor="middle">web</text>
+              <text x="90" y="70" text-anchor="middle">(nginx)</text>
+
+              <rect x="200" y="30" rx="8" ry="8" width="140" height="60" fill="url(#g1)"/>
+              <text x="270" y="55" text-anchor="middle">api</text>
+              <text x="270" y="70" text-anchor="middle">(flask)</text>
+
+              <rect x="380" y="30" rx="8" ry="8" width="140" height="60" fill="url(#g1)"/>
+              <text x="450" y="55" text-anchor="middle">redis</text>
+              <text x="450" y="70" text-anchor="middle">(kv)</text>
+
+              <rect x="200" y="120" rx="8" ry="8" width="140" height="60" fill="url(#g1)"/>
+              <text x="270" y="145" text-anchor="middle">chaos.py</text>
+              <text x="270" y="160" text-anchor="middle">(kills / latency)</text>
+            </g>
+            <!-- Arrows -->
+            <g stroke="#7aa2ff" stroke-width="2" fill="none" marker-end="url(#arrow)">
+              <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,6 L9,3 z" fill="#7aa2ff" />
+                </marker>
+              </defs>
+              <path d="M160,60 L200,60"/>
+              <path d="M340,60 L380,60"/>
+              <path d="M270,120 L270,90"/>
+            </g>
+          </svg>
+          <p class="hint">Nginx proxies <code>/api/</code> → Flask; Flask increments a counter in Redis. The chaos driver randomly kills <em>api</em> or injects latency and measures recovery.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Results Viewer</h2>
+      <p>Drop your generated <code>chaos_report.csv</code> here. We'll compute KPIs and draw charts.</p>
+      <div class="upload">
+        <div class="btnrow">
+          <label class="btn" for="csv">📥 Upload CSV</label>
+          <input id="csv" type="file" accept=".csv,text/csv" style="display:none" />
+          <button class="btn" id="demosample" type="button">🧪 Load sample data</button>
+          <button class="btn" id="clear" type="button">🗑️ Clear</button>
+        </div>
+
+        <div class="kpi" style="margin-top:10px">
+          <div class="kcard"><div class="klabel">Kill events</div><div class="kval" id="k_kills">—</div></div>
+          <div class="kcard"><div class="klabel">Avg recovery (s)</div><div class="kval" id="k_avg_rec">—</div></div>
+          <div class="kcard"><div class="klabel">P95 recovery (s)</div><div class="kval" id="k_p95_rec">—</div></div>
+          <div class="kcard"><div class="klabel">Avg RTT under latency (s)</div><div class="kval" id="k_avg_rtt">—</div></div>
+        </div>
+
+        <div class="grid g-2" style="margin-top:10px">
+          <div class="card" style="background:#0f1736">
+            <h2 style="margin-bottom:8px">Recovery time over time</h2>
+            <canvas id="recChart" height="220" aria-label="Recovery time chart"></canvas>
+          </div>
+          <div class="card" style="background:#0f1736">
+            <h2 style="margin-bottom:8px">Latency vs observed RTT</h2>
+            <canvas id="latChart" height="220" aria-label="Latency vs RTT chart"></canvas>
+          </div>
+        </div>
+
+        <div class="tablewrap" style="margin-top:12px">
+          <table id="tbl">
+            <thead>
+              <tr><th>Timestamp (UTC)</th><th>Event</th><th>Param</th><th>Recovery (s)</th><th>Avg RTT (s)</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid g-2">
+      <article class="card">
+        <h2>What it demonstrates</h2>
+        <ul>
+          <li><strong>Fault tolerance:</strong> API restarts automatically; readiness is gated via healthchecks; proxy recovers.</li>
+          <li><strong>Chaos mindset:</strong> Inject <em>fail-stop</em> (kills) and <em>performance</em> (latency) faults, and measure their user-facing impact.</li>
+          <li><strong>Objective metrics:</strong> Time-to-recovery in seconds, and average RTT under induced latency.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Troubleshooting</h2>
+        <ul>
+          <li><em>/api returns 500:</em> Redis may be warming up; we return 503 now instead of 500 until ready.</li>
+          <li><em>PowerShell "curl" prompts:</em> use <code>curl.exe</code> or <code>Invoke-WebRequest</code>.</li>
+          <li><em>Nginx hangs on upstream:</em> shorten proxy timeouts, or measure health directly on API.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Project Files</h2>
+      <ul>
+        <li><code>docker-compose.yml</code> — 3 services with healthchecks and restarts</li>
+        <li><code>web/nginx.conf</code> — reverse proxy to API</li>
+        <li><code>api/app.py</code> — Flask app + /chaos latency knob</li>
+        <li><code>chaos/chaos.py</code> — driver that kills/adds latency and writes <code>chaos_report.csv</code></li>
+      </ul>
+    </section>
+
+    <footer>
+      Built for a one-day demo. Drop this file into <code>docs/index.html</code> to publish on GitHub Pages.
+    </footer>
+  </main>
+
+  <!-- Chart.js for simple charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // --- Copy buttons ---
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.copybtn');
+      if (!btn) return;
+      const target = document.querySelector(btn.dataset.copy);
+      if (!target) return;
+      navigator.clipboard.writeText(target.textContent).then(() => {
+        const old = btn.textContent; btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = old, 900);
+      });
+    });
+
+    // --- CSV parsing & UI ---
+    const csvInput = document.getElementById('csv');
+    const demoBtn = document.getElementById('demosample');
+    const clearBtn = document.getElementById('clear');
+    const tbody = document.querySelector('#tbl tbody');
+
+    let recChart, latChart;
+
+    function parseCSV(text) {
+      // simple CSV parser (no quotes/escapes needed for our file shape)
+      const lines = text.trim().split(/\r?\n/);
+      const header = lines.shift().split(',').map(s => s.trim());
+      const idx = (k) => header.indexOf(k);
+      const rows = lines.map(line => {
+        const parts = line.split(',');
+        return {
+          timestamp: parts[idx('timestamp')],
+          event: parts[idx('event')],
+          param: parts[idx('param')],
+          recovery: parts[idx('recovery_seconds')] ? parseFloat(parts[idx('recovery_seconds')]) : null,
+          rtt: parts[idx('avg_rtt_seconds')] ? parseFloat(parts[idx('avg_rtt_seconds')]) : null,
+        };
+      });
+      return rows;
+    }
+
+    function percentile(arr, p) {
+      if (!arr.length) return null;
+      const s = [...arr].sort((a,b)=>a-b);
+      const idx = Math.ceil(p/100 * s.length) - 1;
+      return s[Math.max(0, Math.min(idx, s.length-1))];
+    }
+
+    function fmt(n) { return (n == null || Number.isNaN(n)) ? '—' : (+n).toFixed(2); }
+
+    function renderTable(rows) {
+      tbody.innerHTML = '';
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        const pillClass = r.event === 'kill' ? 'pill pill-kill' : 'pill pill-lat';
+        tr.innerHTML = `<td>${r.timestamp}</td>
+                        <td><span class="${pillClass}">${r.event}</span></td>
+                        <td>${r.param ?? ''}</td>
+                        <td>${r.recovery ?? ''}</td>
+                        <td>${r.rtt ?? ''}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function updateKPIs(rows) {
+      const kills = rows.filter(r => r.event === 'kill' && r.recovery != null);
+      const lats = rows.filter(r => r.event === 'latency' && r.rtt != null);
+
+      const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+
+      const avgRec = avg(kills.map(r => r.recovery));
+      const p95Rec = percentile(kills.map(r => r.recovery), 95);
+      const avgRtt = avg(lats.map(r => r.rtt));
+
+      document.getElementById('k_kills').textContent = kills.length;
+      document.getElementById('k_avg_rec').textContent = fmt(avgRec);
+      document.getElementById('k_p95_rec').textContent = fmt(p95Rec);
+      document.getElementById('k_avg_rtt').textContent = fmt(avgRtt);
+    }
+
+    function makeCharts(rows) {
+      const ctx1 = document.getElementById('recChart');
+      const ctx2 = document.getElementById('latChart');
+      const kills = rows.filter(r => r.event === 'kill' && r.recovery != null);
+      const lats = rows.filter(r => r.event === 'latency' && r.rtt != null);
+
+      const labels1 = kills.map(r => new Date(r.timestamp).toLocaleTimeString());
+      const data1 = kills.map(r => r.recovery);
+
+      const labels2 = lats.map(r => r.param + ' ms');
+      const data2 = lats.map(r => r.rtt);
+
+      if (recChart) recChart.destroy();
+      if (latChart) latChart.destroy();
+
+      recChart = new Chart(ctx1, {
+        type: 'line',
+        data: { labels: labels1, datasets: [{ label: 'Recovery (s)', data: data1 }] },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+
+      latChart = new Chart(ctx2, {
+        type: 'bar',
+        data: { labels: labels2, datasets: [{ label: 'Avg RTT (s)', data: data2 }] },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    function loadCSVText(text) {
+      try {
+        const rows = parseCSV(text);
+        renderTable(rows);
+        updateKPIs(rows);
+        makeCharts(rows);
+      } catch (e) {
+        alert('Failed to parse CSV. Make sure it has header: timestamp,event,param,recovery_seconds,avg_rtt_seconds');
+        console.error(e);
+      }
+    }
+
+    csvInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      loadCSVText(text);
+    });
+
+    demoBtn.addEventListener('click', () => {
+      // fabricate a tiny realistic sample set
+      const now = new Date();
+      const addMin = (m)=> new Date(now.getTime() + m*60000).toISOString();
+      const rows = [
+        ['timestamp','event','param','recovery_seconds','avg_rtt_seconds'],
+        [addMin(0), 'kill', 'chaos-lite-api-1', '2.10', ''],
+        [addMin(3), 'latency', '400', '', '0.18'],
+        [addMin(6), 'kill', 'chaos-lite-api-1', '1.70', ''],
+        [addMin(9), 'latency', '1200', '', '0.32'],
+        [addMin(12), 'kill', 'chaos-lite-api-1', '2.60', ''],
+      ];
+      loadCSVText(rows.map(r=>r.join(',')).join('\n'));
+    });
+
+    clearBtn.addEventListener('click', () => {
+      tbody.innerHTML = '';
+      document.getElementById('k_kills').textContent = '—';
+      document.getElementById('k_avg_rec').textContent = '—';
+      document.getElementById('k_p95_rec').textContent = '—';
+      document.getElementById('k_avg_rtt').textContent = '—';
+      if (recChart) recChart.destroy();
+      if (latChart) latChart.destroy();
+    });
+  </script>
+</body>
+</html>
