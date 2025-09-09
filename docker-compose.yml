@@ -1,0 +1,45 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # expose an initial latency of 0ms (can be changed by /chaos endpoint)
+      - CHAOS_LATENCY_MS=0
+    healthcheck:
+      # keep healthcheck fast and unaffected by request latency
+      test: ["CMD", "python", "-c", "import urllib.request;print(urllib.request.urlopen('http://localhost:5000/health', timeout=2).read().decode())"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  web:
+    build: ./web
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+networks:
+  default:
+    name: chaos_net
