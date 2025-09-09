@@ -15,6 +15,7 @@ import requests
 
 WEB_BASE = os.environ.get("WEB_BASE", "http://localhost:8080")
 API_BASE = os.environ.get("API_BASE", "http://localhost:8080/api")
+HEALTH_URL = os.environ.get("HEALTH_URL", "http://localhost:5001/health")
 CONTAINER = os.environ.get("TARGET_CONTAINER", "chaos-lite-api-1")  # docker compose v2 default name
 ROUNDS = int(os.environ.get("ROUNDS", "6"))
 SLEEP_BETWEEN = float(os.environ.get("SLEEP_BETWEEN", "8.0"))
@@ -85,13 +86,16 @@ def main():
 
             if event == "kill":
                 kill_container(CONTAINER)
+                start_container(CONTAINER)
+
                 try:
                     rec = wait_for_health(timeout=90.0)
                 except TimeoutError as e:
                     rec = None
                     print(f"[error] {e}")
+
                 w.writerow([ts,"kill",CONTAINER,rec,""])
-                start_container(CONTAINER)
+                #start_container(CONTAINER)
 
             else:  # latency
                 ms = random.choice([200, 400, 800, 1200, 1600])
